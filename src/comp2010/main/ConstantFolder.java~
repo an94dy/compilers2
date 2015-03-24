@@ -31,36 +31,53 @@ public class ConstantFolder
 	
 	private void optimizeMethod(ClassGen cgen, ConstantPoolGen cpgen, Method method)
 	{
-		// Get the Code of the method, which is a collection of bytecode instructions
+		
 		Code methodCode = method.getCode();
-
-		// Now get the actualy bytecode data in byte array, 
-		// and use it to initialise an InstructionList
 		InstructionList instList = new InstructionList(methodCode.getCode());
-
-		// Initialise a method generator with the original method as the baseline	
 		MethodGen methodGen = new MethodGen(method.getAccessFlags(), method.getReturnType(), method.getArgumentTypes(), null, method.getName(), cgen.getClassName(), instList, cpgen);
+		
 
-		// InstructionHandle is a wrapper for actual Instructions
+		int prevPrevHandle = 0, prevHandle = 0;
+		int prevValue = 0, prevPrevValue = 0;
+		
 		for (InstructionHandle handle : instList.getInstructionHandles())
 		{
-			// if the instruction inside is iconst
-			if (handle.getInstruction() instanceof ArithmeticInstruction)
+			Instruction currentInstruction = handle.getInstruction();
+			if (currentInstruction instanceof LDC) 
 			{
-				// insert new one with integer 5, and...
-				instList.insert(handle, new BIPUSH(6));
+				prevPrevHandle = prevHandle;
+				prevHandle = handle.getPosition();
+				prevPrevValue = prevValue;
+				prevValue = ((LDC)(currentInstruction)).getIndex();
+			
+			}
+
+			if (currentInstruction instanceof ArithmeticInstruction)
+			{			
+			
+				//instList.insert(handle, new LDC(index));
+				
+				//String as = cpgen.getConstant(prevValue).toString();
+				
+				ConstantInteger ci = (ConstantInteger) cpgen.getConstant(prevValue);
+				int as = ci.getBytes();
+				
+				cpgen.addInteger(as);
 				try
 				{
-					// delete the old one
 					instList.delete(handle);
-
+					instList.delete(instList.findHandle(prevHandle));
+					//instList.delete(prev);
+					//instList.delete(prevPrev);
 				}
 				catch (TargetLostException e)
 				{
-					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}
+				
+				
 			}
+			
 		}
 
 		// setPositions(true) checks whether jump handles 
