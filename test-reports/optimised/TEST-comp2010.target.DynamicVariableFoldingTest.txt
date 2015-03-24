@@ -1,0 +1,27 @@
+Testsuite: comp2010.target.DynamicVariableFoldingTest
+Tests run: 4, Failures: 0, Errors: 4, Skipped: 0, Time elapsed: 0.014 sec
+
+Testcase: testMethodThree took 0.002 sec
+	Caused an ERROR
+comp2010.target.DynamicVariableFolding.methodThree()I
+java.lang.NoSuchMethodError: comp2010.target.DynamicVariableFolding.methodThree()I
+	at comp2010.target.DynamicVariableFoldingTest.testMethodThree(Unknown Source)
+
+Testcase: testMethodOne took 0 sec
+	Caused an ERROR
+comp2010.target.DynamicVariableFolding.methodOne()I
+java.lang.NoSuchMethodError: comp2010.target.DynamicVariableFolding.methodOne()I
+	at comp2010.target.DynamicVariableFoldingTest.testMethodOne(Unknown Source)
+
+Testcase: testMethodTwoReturn took 0 sec
+	Caused an ERROR
+comp2010.target.DynamicVariableFolding.methodTwo()Z
+java.lang.NoSuchMethodError: comp2010.target.DynamicVariableFolding.methodTwo()Z
+	at comp2010.target.DynamicVariableFoldingTest.testMethodTwoReturn(Unknown Source)
+
+Testcase: testMethodTwoOut took 0 sec
+	Caused an ERROR
+comp2010.target.DynamicVariableFolding.methodTwo()Z
+java.lang.NoSuchMethodError: comp2010.target.DynamicVariableFolding.methodTwo()Z
+	at comp2010.target.DynamicVariableFoldingTest.testMethodTwoOut(Unknown Source)
+
