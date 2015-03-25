@@ -93,18 +93,31 @@ public class ConstantFolder
 				}
 	
 			}
-			else if (currentInstruction instanceof BIPUSH)
-			{
-				BIPUSH BIPUSHInstruction = (BIPUSH)(currentInstruction);
-				Object BIPUSHValue = BIPUSHInstruction.getValue();
-				if (BIPUSHValue instanceof Integer) {
-					int value = (int)(BIPUSHValue);
-					ppHandle = pHandle;
-					pHandle = handle;
-					prevPrevVal = prevVal;
-					prevVal = value;
-				}
+			else if (currentInstruction instanceof SIPUSH) {
+				
+				SIPUSH SIPUSHInstruction = (SIPUSH)(currentInstruction);
+				Number SIPUSHValue= SIPUSHInstruction.getValue();
+				
+				int value = SIPUSHValue.intValue();
+				ppHandle = pHandle;
+				pHandle = handle;
+				prevPrevVal = prevVal;
+				prevVal = value;
+					
 			}
+			else if (currentInstruction instanceof ICONST) {
+				
+				ICONST ICONSTInstruction = (ICONST)(currentInstruction);
+				Number ICONSTValue= ICONSTInstruction.getValue();
+				
+				int value = ICONSTValue.intValue();
+				ppHandle = pHandle;
+				pHandle = handle;
+				prevPrevVal = prevVal;
+				prevVal = value;
+					
+			}
+
 			else if (pHandle != null && currentInstruction instanceof ArithmeticInstruction) {
 				if (currentInstruction instanceof IADD || currentInstruction instanceof ISUB
 					|| currentInstruction instanceof IMUL || currentInstruction instanceof IDIV
@@ -317,7 +330,6 @@ public class ConstantFolder
 		for (Method m : methods)
 		{
 			optimizeMethod(cgen, cpgen, m);
-
 		}
 
 		this.optimized = cgen.getJavaClass();

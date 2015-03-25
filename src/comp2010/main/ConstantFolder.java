@@ -36,7 +36,7 @@ public class ConstantFolder
 		InstructionList instList = new InstructionList(methodCode.getCode());
 		MethodGen methodGen = new MethodGen(method.getAccessFlags(), method.getReturnType(), method.getArgumentTypes(), null, method.getName(), cgen.getClassName(), instList, cpgen);
 		
-
+		int stackCheck = 0;
 		InstructionHandle pHandle = null, ppHandle = null;
 		Number prevVal = -1, prevPrevVal = -1;
 
@@ -90,11 +90,37 @@ public class ConstantFolder
 					pHandle = handle;
 					prevPrevVal = prevVal;
 					prevVal = value;
+					stackCheck++;
 				}
 	
 			}
+			else if (currentInstruction instanceof SIPUSH) {
+				
+				SIPUSH SIPUSHInstruction = (SIPUSH)(currentInstruction);
+				Number SIPUSHValue= SIPUSHInstruction.getValue();
+				
+				int value = SIPUSHValue.intValue();
+				ppHandle = pHandle;
+				pHandle = handle;
+				prevPrevVal = prevVal;
+				prevVal = value;
+				stackCheck++;
+					
+			}
+			else if (currentInstruction instanceof ICONST) {
+				
+				/*ICONST ICONSTInstruction = (ICONST)(currentInstruction);
+				Number ICONSTValue= ICONSTInstruction.getValue();
+				
+				int value = ICONSTValue.intValue();
+				ppHandle = pHandle;
+				pHandle = handle;
+				prevPrevVal = prevVal;
+				prevVal = value;*/
+					
+			}
 
-			else if (pHandle != null && currentInstruction instanceof ArithmeticInstruction) {
+			else if (pHandle != null && currentInstruction instanceof ArithmeticInstruction && stackCheck > 1) {
 				if (currentInstruction instanceof IADD || currentInstruction instanceof ISUB
 					|| currentInstruction instanceof IMUL || currentInstruction instanceof IDIV
 					|| currentInstruction instanceof IREM) {
@@ -140,6 +166,7 @@ public class ConstantFolder
 					ppHandle = null;
 					prevPrevVal = prevVal;
 					prevVal = result;
+					stackCheck++;
 				}
 				else if (currentInstruction instanceof FADD || currentInstruction instanceof FSUB
 						|| currentInstruction instanceof FMUL || currentInstruction instanceof FDIV
@@ -185,6 +212,7 @@ public class ConstantFolder
 					ppHandle = null;
 					prevPrevVal = prevVal;
 					prevVal = result;
+					stackCheck++;
 				}
 				else if (currentInstruction instanceof LADD || currentInstruction instanceof LSUB
 						|| currentInstruction instanceof LMUL || currentInstruction instanceof LDIV
@@ -230,6 +258,7 @@ public class ConstantFolder
 					ppHandle = null;
 					prevPrevVal = prevVal;
 					prevVal = result;
+					stackCheck++;
 				}
 				else if (currentInstruction instanceof DADD || currentInstruction instanceof DSUB
 						|| currentInstruction instanceof DMUL || currentInstruction instanceof DDIV
@@ -275,6 +304,7 @@ public class ConstantFolder
 					ppHandle = null;
 					prevPrevVal = prevVal;
 					prevVal = result;
+					stackCheck++;
 				}
 			}	
 		}
