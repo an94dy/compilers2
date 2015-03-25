@@ -36,76 +36,247 @@ public class ConstantFolder
 		InstructionList instList = new InstructionList(methodCode.getCode());
 		MethodGen methodGen = new MethodGen(method.getAccessFlags(), method.getReturnType(), method.getArgumentTypes(), null, method.getName(), cgen.getClassName(), instList, cpgen);
 		
-		int prevValue = -1, prevprevValue = -1;
+
 		InstructionHandle pHandle = null, ppHandle = null;
+		Number prevVal = -1, prevPrevVal = -1;
 
 		for (InstructionHandle handle : instList.getInstructionHandles())
 		{
 			Instruction currentInstruction = handle.getInstruction();
 			
-			if (currentInstruction instanceof LDC) {
-				
-				LDC LDCInstruction = (LDC)(currentInstruction);
-				
-				Object LDCValue = LDCInstruction.getValue(cpgen);
-				if (LDCValue instanceof Integer) {
-					int value = (int)(LDCValue);
-					ppHandle = pHandle;
-					pHandle = handle;
-					prevprevValue = prevValue;
-					prevValue = value;
-				}
-			}
-			else {
-				if (pHandle != null) {
-					if (currentInstruction instanceof IADD || currentInstruction instanceof ISUB
-						|| currentInstruction instanceof IMUL || currentInstruction instanceof IDIV
-						|| currentInstruction instanceof IREM) {
-						
-						int sum = 0;
-						
-						if (currentInstruction instanceof IADD){
-							sum = prevprevValue + prevValue;
-						}
-						else if (currentInstruction instanceof ISUB){
-							sum = prevprevValue - prevValue;
-						}
-						else if (currentInstruction instanceof IMUL){
-							sum = prevprevValue * prevValue;
-						}
-						else if (currentInstruction instanceof IDIV){
-							sum = prevprevValue / prevValue;
-						}
-						else if (currentInstruction instanceof IREM){
-							sum = prevprevValue % prevValue;
-						}
-						
-						
-						int newCpIndex = cpgen.addInteger(sum);;
-
-						InstructionHandle newHandle = instList.append(handle, new LDC(newCpIndex));
-						
-						try {
-							instList.delete(pHandle);
-							if (ppHandle != null) {
-								instList.delete(ppHandle);
-							}
-							instList.delete(handle);
-						}
-						catch (TargetLostException e)
-						{
-							e.printStackTrace();
-						}
-						
-						pHandle = newHandle;
-						ppHandle = null;
-
-						prevprevValue = prevValue;
-						prevValue = sum;
+			if (currentInstruction instanceof CPInstruction) {
+				Number value = 0;
+				CPInstruction instruction = (CPInstruction)(currentInstruction);
+				int check = 0;
+				if (instruction instanceof LDC) {
+					LDC LDCInstruction = (LDC)(instruction);
+					Object LDCValue = LDCInstruction.getValue(cpgen);
+					if (LDCValue instanceof Integer) {
+						value = (int)(LDCValue);
+						check = 1;
+					}
+					else if (LDCValue instanceof Float) {
+						value = (float)(LDCValue);
+						check = 1;
 					}
 				}
-				
-			}		
+				else if (instruction instanceof LDC_W) {
+					LDC_W LDC_WInstruction = (LDC_W)(currentInstruction);
+					Object LDC_WValue = LDC_WInstruction.getValue(cpgen);
+					if (LDC_WValue instanceof Integer) {
+						value = (int)(LDC_WValue);
+						check = 1;
+					}
+					else if (LDC_WValue instanceof Float) {
+						value = (float)(LDC_WValue);
+						check = 1;
+					}
+				}
+				else if (instruction instanceof LDC2_W) {
+					LDC2_W LDC2_WInstruction = (LDC2_W)(currentInstruction);
+					Object LDC2_WValue = LDC2_WInstruction.getValue(cpgen);
+					if (LDC2_WValue instanceof Long) {
+						value = (long)(LDC2_WValue);
+						check = 1;
+					}
+					else if (LDC2_WValue instanceof Double) {
+						value = (double)(LDC2_WValue);
+						check = 1;
+					}
+				}
+
+				if (check == 1) {
+					ppHandle = pHandle;
+					pHandle = handle;
+					prevPrevVal = prevVal;
+					prevVal = value;
+				}
+	
+			}
+
+			else if (pHandle != null && currentInstruction instanceof ArithmeticInstruction) {
+				if (currentInstruction instanceof IADD || currentInstruction instanceof ISUB
+					|| currentInstruction instanceof IMUL || currentInstruction instanceof IDIV
+					|| currentInstruction instanceof IREM) {
+					
+					
+					int result = 0;
+					
+					int a = prevPrevVal.intValue();
+					int b = prevVal.intValue();
+					
+					if (currentInstruction instanceof IADD){
+						result = a + b;
+					}
+					else if (currentInstruction instanceof ISUB){
+						result = a - b;
+					}
+					else if (currentInstruction instanceof IMUL){
+						result = a * b;
+					}
+					else if (currentInstruction instanceof IDIV){
+						result = a / b;
+					}
+					else if (currentInstruction instanceof IREM){
+						result = a % b;
+					}
+					
+					int newCpIndex = cpgen.addInteger(result);;
+					InstructionHandle newHandle = instList.append(handle, new LDC(newCpIndex));
+					
+					try {
+						instList.delete(pHandle);
+						if (ppHandle != null) {
+							instList.delete(ppHandle);
+						}
+						instList.delete(handle);
+					}
+					catch (TargetLostException e)
+					{
+						e.printStackTrace();
+					}
+					
+					pHandle = newHandle;
+					ppHandle = null;
+					prevPrevVal = prevVal;
+					prevVal = result;
+				}
+				else if (currentInstruction instanceof FADD || currentInstruction instanceof FSUB
+						|| currentInstruction instanceof FMUL || currentInstruction instanceof FDIV
+						|| currentInstruction instanceof FREM) {
+						
+					float result = 0;
+					
+					float a = prevPrevVal.floatValue();
+					float b = prevVal.floatValue();
+					
+					if (currentInstruction instanceof FADD){
+						result = a + b;
+					}
+					else if (currentInstruction instanceof FSUB){
+						result = a - b;
+					}
+					else if (currentInstruction instanceof FMUL){
+						result = a * b;
+					}
+					else if (currentInstruction instanceof FDIV){
+						result = a / b;
+					}
+					else if (currentInstruction instanceof FREM){
+						result = a % b;
+					}
+					
+					int newCpIndex = cpgen.addFloat(result);;
+					InstructionHandle newHandle = instList.append(handle, new LDC_W(newCpIndex));
+					
+					try {
+						instList.delete(pHandle);
+						if (ppHandle != null) {
+							instList.delete(ppHandle);
+						}
+						instList.delete(handle);
+					}
+					catch (TargetLostException e)
+					{
+						e.printStackTrace();
+					}
+					
+					pHandle = newHandle;
+					ppHandle = null;
+					prevPrevVal = prevVal;
+					prevVal = result;
+				}
+				else if (currentInstruction instanceof LADD || currentInstruction instanceof LSUB
+						|| currentInstruction instanceof LMUL || currentInstruction instanceof LDIV
+						|| currentInstruction instanceof LREM) {
+						
+					long result = 0;
+					
+					long a = prevPrevVal.longValue();
+					long b = prevVal.longValue();
+					
+					if (currentInstruction instanceof LADD){
+						result = a + b;
+					}
+					else if (currentInstruction instanceof LSUB){
+						result = a - b;
+					}
+					else if (currentInstruction instanceof LMUL){
+						result = a * b;
+					}
+					else if (currentInstruction instanceof LDIV){
+						result = a / b;
+					}
+					else if (currentInstruction instanceof LREM){
+						result = a % b;
+					}
+					
+					int newCpIndex = cpgen.addLong(result);
+					InstructionHandle newHandle = instList.append(handle, new LDC2_W(newCpIndex));
+					
+					try {
+						instList.delete(pHandle);
+						if (ppHandle != null) {
+							instList.delete(ppHandle);
+						}
+						instList.delete(handle);
+					}
+					catch (TargetLostException e)
+					{
+						e.printStackTrace();
+					}
+					
+					pHandle = newHandle;
+					ppHandle = null;
+					prevPrevVal = prevVal;
+					prevVal = result;
+				}
+				else if (currentInstruction instanceof DADD || currentInstruction instanceof DSUB
+						|| currentInstruction instanceof DMUL || currentInstruction instanceof DDIV
+						|| currentInstruction instanceof DREM) {
+						
+					double result = 0;
+					
+					double a = prevPrevVal.doubleValue();
+					double b = prevVal.doubleValue();
+					
+					if (currentInstruction instanceof DADD){
+						result = a + b;
+					}
+					else if (currentInstruction instanceof DSUB){
+						result = a - b;
+					}
+					else if (currentInstruction instanceof DMUL){
+						result = a * b;
+					}
+					else if (currentInstruction instanceof DDIV){
+						result = a / b;
+					}
+					else if (currentInstruction instanceof DREM){
+						result = a % b;
+					}
+					
+					int newCpIndex = cpgen.addDouble(result);;
+					InstructionHandle newHandle = instList.append(handle, new LDC2_W(newCpIndex));
+					
+					try {
+						instList.delete(pHandle);
+						if (ppHandle != null) {
+							instList.delete(ppHandle);
+						}
+						instList.delete(handle);
+					}
+					catch (TargetLostException e)
+					{
+						e.printStackTrace();
+					}
+					
+					pHandle = newHandle;
+					ppHandle = null;
+					prevPrevVal = prevVal;
+					prevVal = result;
+				}
+			}	
 		}
 		
 		// setPositions(true) checks whether jump handles 

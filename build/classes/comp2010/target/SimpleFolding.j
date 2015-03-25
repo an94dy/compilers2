@@ -14,9 +14,10 @@
 	.limit stack 3
 
 	getstatic java/lang/System/out Ljava/io/PrintStream;
-	ldc 5
-	ldc 10
-    irem
+	ldc 15
+	ldc 15.155464846684
+    lsub
+	ldc2_w 10000.468640000
 
     
     
