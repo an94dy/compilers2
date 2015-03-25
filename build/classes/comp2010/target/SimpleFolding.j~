@@ -16,8 +16,13 @@
 	getstatic java/lang/System/out Ljava/io/PrintStream;
 	
 	fconst_1
-	fconst_0
+	lconst_0
 	lmul
+	ldc 125
+	ldc 2125
+	ldc 1
+	ldc 2
+	ladd
 	
 
     

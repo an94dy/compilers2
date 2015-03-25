@@ -4,14 +4,20 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 
-
-
 import org.apache.bcel.generic.*;
 import org.apache.bcel.classfile.*;
 
+import java.util.Stack;
+import java.util.EmptyStackException;
+import java.lang.ArithmeticException;
 
 public class ConstantFolder
 {
+	
+	private enum valueType {
+		INT, FLOAT, LONG, DOUBLE, OTHER
+	}
+	
 	ClassParser parser = null;
 	ClassGen gen = null;
 
@@ -29,16 +35,305 @@ public class ConstantFolder
 		}
 	}
 	
+	private void simpleFold (ConstantPoolGen cpgen) {
+		
+	}
+	
+	private static valueType getInstructionReturnType (InstructionHandle handle) {
+		Instruction instruction = handle.getInstruction();
+		
+		if (instruction instanceof IADD || instruction instanceof ISUB
+				|| instruction instanceof IMUL || instruction instanceof IDIV
+				|| instruction instanceof IREM) {
+				
+				return valueType.INT;
+			}
+			else if (instruction instanceof FADD || instruction instanceof FSUB
+					|| instruction instanceof FMUL || instruction instanceof FDIV
+					|| instruction instanceof FREM) {
+				return valueType.FLOAT;
+			}
+			else if (instruction instanceof LADD || instruction instanceof LSUB
+					|| instruction instanceof LMUL || instruction instanceof LDIV
+					|| instruction instanceof LREM) {
+				
+				
+				return valueType.LONG;
+			}
+			else if (instruction instanceof DADD || instruction instanceof DSUB
+					|| instruction instanceof DMUL || instruction instanceof DDIV
+					|| instruction instanceof DREM) {
+				
+				return valueType.DOUBLE;
+			}
+			else {
+				return valueType.OTHER;
+			}
+	}
+	
+	private static Number getVal (ConstantPoolGen cpgen, InstructionHandle handle) {
+		
+		Instruction instruction = handle.getInstruction();
+		Number value = 0;
+		
+		if (instruction instanceof LDC) {
+			LDC LDCInstruction = (LDC)(instruction);
+			Object LDCValue = LDCInstruction.getValue(cpgen);
+			if (LDCValue instanceof Integer) {
+				value = (int)(LDCValue);
+			}
+			else if (LDCValue instanceof Float) {
+				value = (float)(LDCValue);
+			}
+		}
+		else if (instruction instanceof LDC_W) {
+			LDC_W LDC_WInstruction = (LDC_W)(instruction);
+			Object LDC_WValue = LDC_WInstruction.getValue(cpgen);
+			if (LDC_WValue instanceof Integer) {
+				value = (int)(LDC_WValue);
+			}
+			else if (LDC_WValue instanceof Float) {
+				value = (float)(LDC_WValue);
+			}
+		}
+		else if (instruction instanceof LDC2_W) {
+			LDC2_W LDC2_WInstruction = (LDC2_W)(instruction);
+			Object LDC2_WValue = LDC2_WInstruction.getValue(cpgen);
+			if (LDC2_WValue instanceof Long) {
+				value = (long)(LDC2_WValue);
+			}
+			else if (LDC2_WValue instanceof Double) {
+				value = (double)(LDC2_WValue);
+			}
+		}
+		else if (instruction instanceof ICONST) {
+			ICONST ICONSTInstruction = (ICONST)(instruction);
+			Number ICONSTValue = ICONSTInstruction.getValue();
+			value = ICONSTValue.intValue();
+		}
+		else if (instruction instanceof FCONST) {
+			FCONST FCONSTInstruction = (FCONST)(instruction);
+			Number FCONSTValue = FCONSTInstruction.getValue();
+			value = FCONSTValue.floatValue();
+		}
+		else if (instruction instanceof LCONST) {
+			LCONST LCONSTInstruction = (LCONST)(instruction);
+			Number LCONSTValue = LCONSTInstruction.getValue();
+			value = LCONSTValue.longValue();
+		}
+		else if (instruction instanceof DCONST) {
+			DCONST DCONSTInstruction = (DCONST)(instruction);
+			Number DCONSTValue = DCONSTInstruction.getValue();
+			value = DCONSTValue.doubleValue();
+		}
+		else if (instruction instanceof BIPUSH) {
+			BIPUSH BIPUSHInstruction = (BIPUSH)(instruction);
+			Number BIPUSHValue = BIPUSHInstruction.getValue();
+			value = BIPUSHValue.intValue();				
+		}
+		else if (instruction instanceof SIPUSH) {
+			SIPUSH SIPUSHInstruction = (SIPUSH)(instruction);
+			Number SIPUSHValue = SIPUSHInstruction.getValue();
+			value = SIPUSHValue.intValue();
+		}
+
+		return value;
+	}
+	
+	private static Number getResult (Number ppVal, Number pVal, InstructionHandle handle) {
+		
+		Instruction instruction = handle.getInstruction();
+		valueType type = getInstructionReturnType(handle);
+		Number result = 0;
+		
+		try {
+		
+			switch (type) {
+				
+				case INT:
+					
+					int inta = ppVal.intValue();
+					int intb = pVal.intValue();
+					
+					if (instruction instanceof IADD){
+						result = inta + intb;
+					}
+					else if (instruction instanceof ISUB){
+						result = inta - intb;
+					}
+					else if (instruction instanceof IMUL){
+						result = inta * intb;
+					}
+					else if (instruction instanceof IDIV){
+						result = inta / intb;
+					}
+					else if (instruction instanceof IREM){
+						result = inta % intb;
+					}
+					
+					break;
+					
+				case FLOAT:
+					
+					float floata = ppVal.floatValue();
+					float floatb = pVal.floatValue();
+					
+					if (instruction instanceof FADD){
+						result = floata + floatb;
+					}
+					else if (instruction instanceof FSUB){
+						result = floata - floatb;
+					}
+					else if (instruction instanceof FMUL){
+						result = floata * floatb;
+					}
+					else if (instruction instanceof FDIV){
+						result = floata / floatb;
+					}
+					else if (instruction instanceof FREM){
+						result = floata % floatb;
+					}
+					
+					break;
+					
+				case LONG:
+						
+					long longa = ppVal.longValue();
+					long longb = pVal.longValue();
+					
+					if (instruction instanceof LADD){
+						result = longa + longb;
+					}
+					else if (instruction instanceof LSUB){
+						result = longa - longb;
+					}
+					else if (instruction instanceof LMUL){
+						result = longa * longb;
+					}
+					else if (instruction instanceof LDIV){
+						result = longa / longb;
+					}
+					else if (instruction instanceof LREM){
+						result = longa % longb;
+					}
+					
+					break;
+					
+				case DOUBLE:
+					
+					double doublea = ppVal.doubleValue();
+					double doubleb = pVal.doubleValue();
+					
+					if (instruction instanceof DADD){
+						result = doublea + doubleb;
+					}
+					else if (instruction instanceof DSUB){
+						result = doublea - doubleb;
+					}
+					else if (instruction instanceof DMUL){
+						result = doublea * doubleb;
+					}
+					else if (instruction instanceof DDIV){
+						result = doublea / doubleb;
+					}
+					else if (instruction instanceof DREM){
+						result = doublea % doubleb;
+					}
+					
+					break;
+					
+				case OTHER:
+					break;
+			}
+		}
+		catch (ArithmeticException e) {
+		}
+			
+		
+		return result;
+	}
+	
+	private static InstructionHandle foldInstructions (InstructionHandle ppHandle, InstructionHandle pHandle, InstructionHandle handle, InstructionList instList, ConstantPoolGen cpgen) {
+	
+		InstructionHandle newHandle;
+		valueType type = getInstructionReturnType(handle);
+		
+		Number pVal = getVal(cpgen, pHandle);
+		Number ppVal = getVal(cpgen, ppHandle);
+		Number result = getResult(ppVal, pVal, handle);
+		
+		switch (type) {
+			case INT:
+				/*int val = result.intValue();
+				if (val >= -1 && val <= 5) {
+					newHandle = instList.append(handle, new ICONST((byte)(val)));
+				}
+				else if (val >= -128 && val <= 127) {
+					newHandle = instList.append(handle, new BIPUSH((byte)(val)));
+				}
+				else if (val >= -32768 && val <= 32767) {
+					newHandle = instList.append(handle, new SIPUSH((short)(val)));
+				}
+				else {
+					newCpIndex = cpgen.addInteger(val);
+					newHandle = instList.append(handle, new LDC(newCpIndex));
+				}*/
+				newHandle = instList.append(handle, new PUSH(cpgen, result.intValue()));
+				break;
+				
+			case FLOAT:
+				//newCpIndex = cpgen.addFloat(result.floatValue());;
+				//newHandle = instList.append(handle, new LDC_W(newCpIndex));
+				newHandle = instList.append(handle, new PUSH(cpgen, result.floatValue()));
+				break;
+				
+			case LONG:
+				//newCpIndex = cpgen.addLong(result.longValue());
+				//newHandle = instList.append(handle, new LDC2_W(newCpIndex));
+				newHandle = instList.append(handle, new PUSH(cpgen, result.longValue()));
+				break;
+				
+			case DOUBLE:
+				//newCpIndex = cpgen.addDouble(result.doubleValue());
+				//newHandle = instList.append(handle, new LDC2_W(newCpIndex));
+				newHandle = instList.append(handle, new PUSH(cpgen, result.doubleValue()));
+				break;
+				
+			default:
+				newHandle = handle;
+				break;
+		}
+		
+		try {
+			instList.delete(pHandle);
+			instList.delete(ppHandle);
+			instList.delete(handle);
+		}
+		catch (TargetLostException e)
+		{
+		     InstructionHandle[] targets = e.getTargets();
+
+		     for(int i=0; i < targets.length; i++) {
+		          InstructionTargeter[] targeters = targets[i].getTargeters();
+
+		          for(int j=0; j < targeters.length; j++)
+		               targeters[j].updateTarget(targets[i], handle);
+		     }
+		}
+		
+		return newHandle;
+	}
+	
 	private void optimizeMethod(ClassGen cgen, ConstantPoolGen cpgen, Method method)
 	{
 		
 		Code methodCode = method.getCode();
 		InstructionList instList = new InstructionList(methodCode.getCode());
 		MethodGen methodGen = new MethodGen(method.getAccessFlags(), method.getReturnType(), method.getArgumentTypes(), null, method.getName(), cgen.getClassName(), instList, cpgen);
+	
+		Stack instructionStack = new Stack();
 		
-		int stackCheck = 0;
-		InstructionHandle pHandle = null, ppHandle = null;
-		Number prevVal = -1, prevPrevVal = -1;
+		
 		
 		InstructionHandle[] instructionHandles = instList.getInstructionHandles();
 		int length = instructionHandles.length;
@@ -49,310 +344,26 @@ public class ConstantFolder
 			InstructionHandle handle = instructionHandles[k];
 			Instruction currentInstruction = handle.getInstruction();
 			
-			if (currentInstruction instanceof CPInstruction) {
-				Number value = 0;
-				CPInstruction instruction = (CPInstruction)(currentInstruction);
-				int check = 0;
-				if (instruction instanceof LDC) {
-					LDC LDCInstruction = (LDC)(instruction);
-					Object LDCValue = LDCInstruction.getValue(cpgen);
-					if (LDCValue instanceof Integer) {
-						value = (int)(LDCValue);
-						check = 1;
-					}
-					else if (LDCValue instanceof Float) {
-						value = (float)(LDCValue);
-						check = 1;
-					}
-				}
-				else if (instruction instanceof LDC_W) {
-					LDC_W LDC_WInstruction = (LDC_W)(currentInstruction);
-					Object LDC_WValue = LDC_WInstruction.getValue(cpgen);
-					if (LDC_WValue instanceof Integer) {
-						value = (int)(LDC_WValue);
-						check = 1;
-					}
-					else if (LDC_WValue instanceof Float) {
-						value = (float)(LDC_WValue);
-						check = 1;
-					}
-				}
-				else if (instruction instanceof LDC2_W) {
-					LDC2_W LDC2_WInstruction = (LDC2_W)(currentInstruction);
-					Object LDC2_WValue = LDC2_WInstruction.getValue(cpgen);
-					if (LDC2_WValue instanceof Long) {
-						value = (long)(LDC2_WValue);
-						check = 1;
-					}
-					else if (LDC2_WValue instanceof Double) {
-						value = (double)(LDC2_WValue);
-						check = 1;
-					}
-				}
+			if (currentInstruction instanceof CPInstruction || currentInstruction instanceof ICONST
+				|| currentInstruction instanceof FCONST || currentInstruction instanceof LCONST
+				|| currentInstruction instanceof DCONST || currentInstruction instanceof BIPUSH
+				|| currentInstruction instanceof SIPUSH) {
+				
+				instructionStack.push(handle);
 
-				if (check == 1) {
-					ppHandle = pHandle;
-					pHandle = handle;
-					prevPrevVal = prevVal;
-					prevVal = value;
-					stackCheck++;
+			}
+			else if (currentInstruction instanceof ArithmeticInstruction && instructionStack.size() > 1) {
+				InstructionHandle pHandle = null, ppHandle = null;
+				try {
+					pHandle = (InstructionHandle)(instructionStack.pop());
+					ppHandle = (InstructionHandle)(instructionStack.pop());
 				}
-	
-			}
-			else if (currentInstruction instanceof BIPUSH) {
-				
-				BIPUSH BIPUSHInstruction = (BIPUSH)(currentInstruction);
-				Number BIPUSHValue= BIPUSHInstruction.getValue();
-				
-				int value = BIPUSHValue.intValue();
-				ppHandle = pHandle;
-				pHandle = handle;
-				prevPrevVal = prevVal;
-				prevVal = value;
-				stackCheck++;
-					
-			}
-			else if (currentInstruction instanceof SIPUSH) {
-				
-				SIPUSH SIPUSHInstruction = (SIPUSH)(currentInstruction);
-				Number SIPUSHValue= SIPUSHInstruction.getValue();
-				
-				int value = SIPUSHValue.intValue();
-				ppHandle = pHandle;
-				pHandle = handle;
-				prevPrevVal = prevVal;
-				prevVal = value;
-				stackCheck++;
-					
-			}
-			else if (currentInstruction instanceof ICONST) {
-				
-				ICONST ICONSTInstruction = (ICONST)(currentInstruction);
-				Number ICONSTValue= ICONSTInstruction.getValue();
-				
-				int value = ICONSTValue.intValue();
-				ppHandle = pHandle;
-				pHandle = handle;
-				prevPrevVal = prevVal;
-				prevVal = value;
-				//stackCheck++;	 WHY DOES THIS GIVE AN ERROR?!?!?!
-			}
-			else if (currentInstruction instanceof FCONST) {
-				
-				FCONST FCONSTInstruction = (FCONST)(currentInstruction);
-				Number FCONSTValue= FCONSTInstruction.getValue();
-				
-				float value = FCONSTValue.floatValue();
-				
-				ppHandle = pHandle;
-				pHandle = handle;
-				prevPrevVal = prevVal;
-				prevVal = value;
-				stackCheck++;	
-			}
-			else if (currentInstruction instanceof LCONST) {
-				
-				LCONST LCONSTInstruction = (LCONST)(currentInstruction);
-				Number LCONSTValue= LCONSTInstruction.getValue();
-				
-				long value = LCONSTValue.longValue();
-				
-				ppHandle = pHandle;
-				pHandle = handle;
-				prevPrevVal = prevVal;
-				prevVal = value;
-				stackCheck++;	
-			}
-			else if (currentInstruction instanceof DCONST) {
-				
-				DCONST DCONSTInstruction = (DCONST)(currentInstruction);
-				Number DCONSTValue= DCONSTInstruction.getValue();
-				
-				double value = DCONSTValue.doubleValue();
-				
-				ppHandle = pHandle;
-				pHandle = handle;
-				prevPrevVal = prevVal;
-				prevVal = value;
-				stackCheck++;	
-			}
-
-			else if (pHandle != null && currentInstruction instanceof ArithmeticInstruction && stackCheck > 1) {
-				Number result = 0;
-				int check = 0;
-				int newCpIndex = 0;
-				
-				if (currentInstruction instanceof IADD || currentInstruction instanceof ISUB
-					|| currentInstruction instanceof IMUL || currentInstruction instanceof IDIV
-					|| currentInstruction instanceof IREM) {
-					
-					int a = prevPrevVal.intValue();
-					int b = prevVal.intValue();
-					
-					if (currentInstruction instanceof IADD){
-						result = a + b;
-					}
-					else if (currentInstruction instanceof ISUB){
-						result = a - b;
-					}
-					else if (currentInstruction instanceof IMUL){
-						result = a * b;
-					}
-					else if (currentInstruction instanceof IDIV){
-						result = a / b;
-					}
-					else if (currentInstruction instanceof IREM){
-						result = a % b;
-					}
-					
-					check = 1;
+				catch (EmptyStackException e) {
+					e.printStackTrace();
+					continue;
 				}
-				else if (currentInstruction instanceof FADD || currentInstruction instanceof FSUB
-						|| currentInstruction instanceof FMUL || currentInstruction instanceof FDIV
-						|| currentInstruction instanceof FREM) {
-					
-					float a = prevPrevVal.floatValue();
-					float b = prevVal.floatValue();
-					
-					if (currentInstruction instanceof FADD){
-						result = a + b;
-					}
-					else if (currentInstruction instanceof FSUB){
-						result = a - b;
-					}
-					else if (currentInstruction instanceof FMUL){
-						result = a * b;
-					}
-					else if (currentInstruction instanceof FDIV){
-						result = a / b;
-					}
-					else if (currentInstruction instanceof FREM){
-						result = a % b;
-					}
-					
-					check = 2;
-				}
-				else if (currentInstruction instanceof LADD || currentInstruction instanceof LSUB
-						|| currentInstruction instanceof LMUL || currentInstruction instanceof LDIV
-						|| currentInstruction instanceof LREM) {
-					
-					long a = prevPrevVal.longValue();
-					long b = prevVal.longValue();
-					
-					if (currentInstruction instanceof LADD){
-						result = a + b;
-					}
-					else if (currentInstruction instanceof LSUB){
-						result = a - b;
-					}
-					else if (currentInstruction instanceof LMUL){
-						result = a * b;
-					}
-					else if (currentInstruction instanceof LDIV){
-						result = a / b;
-					}
-					else if (currentInstruction instanceof LREM){
-						result = a % b;
-					}
-					
-					check = 3;
-				}
-				else if (currentInstruction instanceof DADD || currentInstruction instanceof DSUB
-						|| currentInstruction instanceof DMUL || currentInstruction instanceof DDIV
-						|| currentInstruction instanceof DREM) {
-					
-					double a = prevPrevVal.doubleValue();
-					double b = prevVal.doubleValue();
-					
-					if (currentInstruction instanceof DADD){
-						result = a + b;
-					}
-					else if (currentInstruction instanceof DSUB){
-						result = a - b;
-					}
-					else if (currentInstruction instanceof DMUL){
-						result = a * b;
-					}
-					else if (currentInstruction instanceof DDIV){
-						result = a / b;
-					}
-					else if (currentInstruction instanceof DREM){
-						result = a % b;
-					}
-					
-					check = 4;
-				}
-				
-				if (check > 0) {
-					InstructionHandle newHandle;
-					switch (check) {
-						case 1: //integer
-							/*int val = result.intValue();
-							if (val >= -1 && val <= 5) {
-								newHandle = instList.append(handle, new ICONST((byte)(val)));
-							}
-							else if (val >= -128 && val <= 127) {
-								newHandle = instList.append(handle, new BIPUSH((byte)(val)));
-							}
-							else if (val >= -32768 && val <= 32767) {
-								newHandle = instList.append(handle, new SIPUSH((short)(val)));
-							}
-							else {
-								newCpIndex = cpgen.addInteger(val);
-								newHandle = instList.append(handle, new LDC(newCpIndex));
-							}*/
-							newHandle = instList.append(handle, new PUSH(cpgen, result.intValue()));
-							break;
-							
-						case 2: //float
-							//newCpIndex = cpgen.addFloat(result.floatValue());;
-							//newHandle = instList.append(handle, new LDC_W(newCpIndex));
-							newHandle = instList.append(handle, new PUSH(cpgen, result.floatValue()));
-							break;
-							
-						case 3: //long
-							//newCpIndex = cpgen.addLong(result.longValue());
-							//newHandle = instList.append(handle, new LDC2_W(newCpIndex));
-							newHandle = instList.append(handle, new PUSH(cpgen, result.longValue()));
-							break;
-							
-						case 4: //double
-							//newCpIndex = cpgen.addDouble(result.doubleValue());
-							//newHandle = instList.append(handle, new LDC2_W(newCpIndex));
-							newHandle = instList.append(handle, new PUSH(cpgen, result.doubleValue()));
-							break;
-							
-						default:
-							newHandle = handle;
-							break;
-					}
-					
-					
-					
-					try {
-						instList.delete(pHandle);
-						if (ppHandle != null) {
-							instList.delete(ppHandle);
-						}
-						instList.delete(handle);
-					}
-					catch (TargetLostException e)
-					{
-					     InstructionHandle[] targets = e.getTargets();
-
-					     for(int i=0; i < targets.length; i++) {
-					          InstructionTargeter[] targeters = targets[i].getTargeters();
-
-					          for(int j=0; j < targeters.length; j++)
-					               targeters[j].updateTarget(targets[i], handle);
-					     }
-					}
-					pHandle = newHandle;
-					ppHandle = null;
-					prevPrevVal = prevVal;
-					prevVal = result;
-					stackCheck++;
-				}
+				InstructionHandle newHandle = foldInstructions(ppHandle, pHandle, handle, instList, cpgen);
+				instructionStack.push(newHandle);
 			}	
 		}
 		

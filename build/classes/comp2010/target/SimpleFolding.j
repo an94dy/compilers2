@@ -14,14 +14,13 @@
 	.limit stack 3
 
 	getstatic java/lang/System/out Ljava/io/PrintStream;
-	
-	fconst_1
-	lconst_0
-	lmul
-	
-
-    
-    
+    ldc 20
+    iconst_1
+    ldc 40
+    ldc 50
+    iadd
+    iadd
+    iadd
     invokevirtual java/io/PrintStream/println(I)V
 	return
 .end method

@@ -4,11 +4,11 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 
-
-
 import org.apache.bcel.generic.*;
 import org.apache.bcel.classfile.*;
 
+import java.util.Stack;
+import java.util.EmptyStackException;
 
 public class ConstantFolder
 {
@@ -36,9 +36,9 @@ public class ConstantFolder
 		InstructionList instList = new InstructionList(methodCode.getCode());
 		MethodGen methodGen = new MethodGen(method.getAccessFlags(), method.getReturnType(), method.getArgumentTypes(), null, method.getName(), cgen.getClassName(), instList, cpgen);
 		
+		Stack stack = new Stack();
 		int stackCheck = 0;
 		InstructionHandle pHandle = null, ppHandle = null;
-		Number prevVal = -1, prevPrevVal = -1;
 		
 		InstructionHandle[] instructionHandles = instList.getInstructionHandles();
 		int length = instructionHandles.length;
@@ -93,11 +93,9 @@ public class ConstantFolder
 				if (check == 1) {
 					ppHandle = pHandle;
 					pHandle = handle;
-					prevPrevVal = prevVal;
-					prevVal = value;
 					stackCheck++;
+					stack.push(value);
 				}
-	
 			}
 			else if (currentInstruction instanceof BIPUSH) {
 				
@@ -107,9 +105,8 @@ public class ConstantFolder
 				int value = BIPUSHValue.intValue();
 				ppHandle = pHandle;
 				pHandle = handle;
-				prevPrevVal = prevVal;
-				prevVal = value;
 				stackCheck++;
+				stack.push(value);
 					
 			}
 			else if (currentInstruction instanceof SIPUSH) {
@@ -120,9 +117,8 @@ public class ConstantFolder
 				int value = SIPUSHValue.intValue();
 				ppHandle = pHandle;
 				pHandle = handle;
-				prevPrevVal = prevVal;
-				prevVal = value;
 				stackCheck++;
+				stack.push(value);
 					
 			}
 			else if (currentInstruction instanceof ICONST) {
@@ -133,13 +129,10 @@ public class ConstantFolder
 				int value = ICONSTValue.intValue();
 				ppHandle = pHandle;
 				pHandle = handle;
-				prevPrevVal = prevVal;
-				prevVal = value;
-				
-					
+				//stack.push(value);
+				//stackCheck++;	 WHY DOES THIS GIVE AN ERROR?!?!?!
 			}
 			else if (currentInstruction instanceof FCONST) {
-				
 				
 				FCONST FCONSTInstruction = (FCONST)(currentInstruction);
 				Number FCONSTValue= FCONSTInstruction.getValue();
@@ -148,16 +141,49 @@ public class ConstantFolder
 				
 				ppHandle = pHandle;
 				pHandle = handle;
-				prevPrevVal = prevVal;
-				prevVal = value;
-				stackCheck++;
-					
+				stackCheck++;	
+				stack.push(value);
+			}
+			else if (currentInstruction instanceof LCONST) {
+				
+				LCONST LCONSTInstruction = (LCONST)(currentInstruction);
+				Number LCONSTValue= LCONSTInstruction.getValue();
+				
+				long value = LCONSTValue.longValue();
+				
+				ppHandle = pHandle;
+				pHandle = handle;
+				stackCheck++;	
+				stack.push(value);
+			}
+			else if (currentInstruction instanceof DCONST) {
+				
+				DCONST DCONSTInstruction = (DCONST)(currentInstruction);
+				Number DCONSTValue= DCONSTInstruction.getValue();
+				
+				double value = DCONSTValue.doubleValue();
+				
+				ppHandle = pHandle;
+				pHandle = handle;
+				stackCheck++;	
+				stack.push(value);
 			}
 
-			else if (pHandle != null && currentInstruction instanceof ArithmeticInstruction && stackCheck > 1) {
+			else if (pHandle != null && currentInstruction instanceof ArithmeticInstruction && !stack.isEmpty()) {
 				Number result = 0;
 				int check = 0;
 				int newCpIndex = 0;
+				Number prevVal, prevPrevVal;
+				
+				try {
+					prevVal = (Number)(stack.pop());
+					prevPrevVal = (Number)(stack.pop());
+				}
+				catch (EmptyStackException e) {
+					e.printStackTrace();
+					continue;
+				}
+				
 				
 				if (currentInstruction instanceof IADD || currentInstruction instanceof ISUB
 					|| currentInstruction instanceof IMUL || currentInstruction instanceof IDIV
@@ -165,6 +191,7 @@ public class ConstantFolder
 					
 					int a = prevPrevVal.intValue();
 					int b = prevVal.intValue();
+
 					
 					if (currentInstruction instanceof IADD){
 						result = a + b;
@@ -176,7 +203,7 @@ public class ConstantFolder
 						result = a * b;
 					}
 					else if (currentInstruction instanceof IDIV){
-						//result = a / b;
+						result = a / b;
 					}
 					else if (currentInstruction instanceof IREM){
 						result = a % b;
@@ -279,32 +306,34 @@ public class ConstantFolder
 								newHandle = instList.append(handle, new LDC(newCpIndex));
 							}*/
 							newHandle = instList.append(handle, new PUSH(cpgen, result.intValue()));
+							stack.push(result.intValue());
 							break;
 							
 						case 2: //float
 							//newCpIndex = cpgen.addFloat(result.floatValue());;
 							//newHandle = instList.append(handle, new LDC_W(newCpIndex));
 							newHandle = instList.append(handle, new PUSH(cpgen, result.floatValue()));
+							stack.push(result.floatValue());
 							break;
 							
 						case 3: //long
 							//newCpIndex = cpgen.addLong(result.longValue());
 							//newHandle = instList.append(handle, new LDC2_W(newCpIndex));
 							newHandle = instList.append(handle, new PUSH(cpgen, result.longValue()));
+							stack.push(result.longValue());
 							break;
 							
 						case 4: //double
 							//newCpIndex = cpgen.addDouble(result.doubleValue());
 							//newHandle = instList.append(handle, new LDC2_W(newCpIndex));
 							newHandle = instList.append(handle, new PUSH(cpgen, result.doubleValue()));
+							stack.push(result.doubleValue());
 							break;
 							
 						default:
 							newHandle = handle;
 							break;
 					}
-					
-					
 					
 					try {
 						instList.delete(pHandle);
@@ -326,8 +355,6 @@ public class ConstantFolder
 					}
 					pHandle = newHandle;
 					ppHandle = null;
-					prevPrevVal = prevVal;
-					prevVal = result;
 					stackCheck++;
 				}
 			}	
