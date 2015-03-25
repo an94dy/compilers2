@@ -39,46 +39,97 @@ public class ConstantFolder
 
 		int prevPrevHandle = 0, prevHandle = 0;
 		int prevValue = -1, prevprevValue = -1;
-		
+		InstructionHandle pHandle = null, ppHandle = null;
+		int i = 0;
 		for (InstructionHandle handle : instList.getInstructionHandles())
 		{
 			Instruction currentInstruction = handle.getInstruction();
+			i++;
 			
-			if (currentInstruction instanceof LDC) 
+			
+			if (currentInstruction instanceof LDC) {
+				int instructionIndex = handle.getPosition();
+				LDC LDCInstruction = (LDC)(currentInstruction);
+				int cpIndex = LDCInstruction.getIndex();
+				
+				Object LDCValue = LDCInstruction.getValue(cpgen);
+				if (LDCValue instanceof Integer) {
+					int value = (int)(LDCValue);
+					ppHandle = pHandle;
+					pHandle = handle;
+					prevPrevHandle = prevHandle;
+					prevHandle = instructionIndex;
+					prevprevValue = prevValue;
+					prevValue = value;
+					cpgen.addString(instructionIndex + "_" + cpIndex + "_" + value + "_suck_" + i + ": " + currentInstruction.toString());
+				}
+				
+			}
+			else {
+				if (currentInstruction instanceof IADD && pHandle != null && ppHandle != null) {
+					
+					
+					int newCpIndex = cpgen.addInteger(prevValue + prevprevValue);
+					instList.insert(handle, new LDC(newCpIndex));
+					try {
+						instList.delete(pHandle);
+						instList.delete(ppHandle);
+						instList.delete(handle);
+					}
+					catch (TargetLostException e)
+					{
+						e.printStackTrace();
+					}
+					
+					
+				}
+			}
+			
+			
+			/*if (currentInstruction instanceof LDC) 
 			{
 				prevPrevHandle = prevHandle;
 				prevHandle = handle.getPosition();
 				
 				int pindex = ((LDC)(currentInstruction)).getIndex();
-				int ppindex = pindex;
+				//int ppindex = pindex;
 				
 				
-				try {
-				ConstantPool cp = cpgen.getConstantPool();
-				ConstantInteger prevIndexCI = (ConstantInteger)(cpgen.getConstant(pindex));
-				prevprevValue = prevValue;
-				prevValue = Integer.parseInt((prevIndexCI.getConstantValue(cp)).toString());
-				}
-				catch (Error e){
+				
+				Constant consta = cpgen.getConstant(pindex);
+				if (consta instanceof ConstantInteger){
+					ConstantInteger prevIndexCI = (ConstantInteger) (consta);
+					prevprevValue = prevValue;
+					ConstantPool cp = cpgen.getConstantPool();
+					cpgen.addString("LDC + " + currentInstruction.toString());
+					prevValue = Integer.parseInt((prevIndexCI.getConstantValue(cp)).toString());
+					//cpgen.addInteger(prevValue);
 					
 				}
+				else {
+					cpgen.addString("suck + " + currentInstruction.toString());
+				}
+				
+				
 				
 				
 			}
-
-			if (currentInstruction instanceof ArithmeticInstruction && prevValue != -1 && prevprevValue != -1)
+			else if (currentInstruction instanceof ArithmeticInstruction)
 			{			
 			
 				//instList.insert(handle, new LDC(index));
 				
 				int sum = prevValue + prevprevValue;
 				
-				
+				instList.insert(handle, new LDC(prevValue));
+				//instList.insert(handle, new LDC(prevprevValue));
+				instList.insert(handle, new LDC(sum));
 				//cpgen.addInteger(asd);
 				
-				cpgen.addInteger(prevValue);
-				cpgen.addInteger(prevprevValue);
-				cpgen.addInteger(sum);
+				//cpgen.addInteger(prevValue);
+				//cpgen.addInteger(prevprevValue - 10);
+				//cpgen.addInteger(sum);
+
 				try
 				{
 					instList.delete(handle);
@@ -94,9 +145,9 @@ public class ConstantFolder
 				
 			}
 			
-			
+		_*/	
 		}
-
+		
 		// setPositions(true) checks whether jump handles 
 		// are all within the current method
 		instList.setPositions(true);
@@ -126,10 +177,6 @@ public class ConstantFolder
 			optimizeMethod(cgen, cpgen, m);
 
 		}
-			
-
-
-
 
 		this.optimized = cgen.getJavaClass();
 	}
