@@ -16,7 +16,7 @@
 	getstatic java/lang/System/out Ljava/io/PrintStream;
 	ldc 5
 	ldc 10
-    irem
+    idiv
 
     
     

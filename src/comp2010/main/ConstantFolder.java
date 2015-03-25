@@ -36,116 +36,76 @@ public class ConstantFolder
 		InstructionList instList = new InstructionList(methodCode.getCode());
 		MethodGen methodGen = new MethodGen(method.getAccessFlags(), method.getReturnType(), method.getArgumentTypes(), null, method.getName(), cgen.getClassName(), instList, cpgen);
 		
-
-		int prevPrevHandle = 0, prevHandle = 0;
 		int prevValue = -1, prevprevValue = -1;
 		InstructionHandle pHandle = null, ppHandle = null;
-		int i = 0;
+
 		for (InstructionHandle handle : instList.getInstructionHandles())
 		{
 			Instruction currentInstruction = handle.getInstruction();
-			i++;
-			
 			
 			if (currentInstruction instanceof LDC) {
-				int instructionIndex = handle.getPosition();
+				
 				LDC LDCInstruction = (LDC)(currentInstruction);
-				int cpIndex = LDCInstruction.getIndex();
 				
 				Object LDCValue = LDCInstruction.getValue(cpgen);
 				if (LDCValue instanceof Integer) {
 					int value = (int)(LDCValue);
 					ppHandle = pHandle;
 					pHandle = handle;
-					prevPrevHandle = prevHandle;
-					prevHandle = instructionIndex;
 					prevprevValue = prevValue;
 					prevValue = value;
-					cpgen.addString(instructionIndex + "_" + cpIndex + "_" + value + "_suck_" + i + ": " + currentInstruction.toString());
 				}
-				
 			}
 			else {
-				if (currentInstruction instanceof IADD && pHandle != null && ppHandle != null) {
-					
-					
-					int newCpIndex = cpgen.addInteger(prevValue + prevprevValue);
-					instList.insert(handle, new LDC(newCpIndex));
-					try {
-						instList.delete(pHandle);
-						instList.delete(ppHandle);
-						instList.delete(handle);
-					}
-					catch (TargetLostException e)
-					{
-						e.printStackTrace();
-					}
-					
-					
-				}
-			}
-			
-			
-			/*if (currentInstruction instanceof LDC) 
-			{
-				prevPrevHandle = prevHandle;
-				prevHandle = handle.getPosition();
-				
-				int pindex = ((LDC)(currentInstruction)).getIndex();
-				//int ppindex = pindex;
-				
-				
-				
-				Constant consta = cpgen.getConstant(pindex);
-				if (consta instanceof ConstantInteger){
-					ConstantInteger prevIndexCI = (ConstantInteger) (consta);
-					prevprevValue = prevValue;
-					ConstantPool cp = cpgen.getConstantPool();
-					cpgen.addString("LDC + " + currentInstruction.toString());
-					prevValue = Integer.parseInt((prevIndexCI.getConstantValue(cp)).toString());
-					//cpgen.addInteger(prevValue);
-					
-				}
-				else {
-					cpgen.addString("suck + " + currentInstruction.toString());
-				}
-				
-				
-				
-				
-			}
-			else if (currentInstruction instanceof ArithmeticInstruction)
-			{			
-			
-				//instList.insert(handle, new LDC(index));
-				
-				int sum = prevValue + prevprevValue;
-				
-				instList.insert(handle, new LDC(prevValue));
-				//instList.insert(handle, new LDC(prevprevValue));
-				instList.insert(handle, new LDC(sum));
-				//cpgen.addInteger(asd);
-				
-				//cpgen.addInteger(prevValue);
-				//cpgen.addInteger(prevprevValue - 10);
-				//cpgen.addInteger(sum);
+				if (pHandle != null) {
+					if (currentInstruction instanceof IADD || currentInstruction instanceof ISUB
+						|| currentInstruction instanceof IMUL || currentInstruction instanceof IDIV
+						|| currentInstruction instanceof IREM) {
+						
+						int sum = 0;
+						
+						if (currentInstruction instanceof IADD){
+							sum = prevprevValue + prevValue;
+						}
+						else if (currentInstruction instanceof ISUB){
+							sum = prevprevValue - prevValue;
+						}
+						else if (currentInstruction instanceof IMUL){
+							sum = prevprevValue * prevValue;
+						}
+						else if (currentInstruction instanceof IDIV){
+							sum = prevprevValue / prevValue;
+						}
+						else if (currentInstruction instanceof IREM){
+							sum = prevprevValue % prevValue;
+						}
+						
+						
+						int newCpIndex = cpgen.addInteger(sum);;
 
-				try
-				{
-					instList.delete(handle);
-					//instList.delete(instList.findHandle(prevHandle));
-					//instList.delete(prev);
-					//instList.delete(prevPrev);
-				}
-				catch (TargetLostException e)
-				{
-					e.printStackTrace();
+						InstructionHandle newHandle = instList.append(handle, new LDC(newCpIndex));
+						
+						try {
+							instList.delete(pHandle);
+							if (ppHandle != null) {
+								instList.delete(ppHandle);
+							}
+							instList.delete(handle);
+						}
+						catch (TargetLostException e)
+						{
+							e.printStackTrace();
+						}
+						
+						pHandle = newHandle;
+						ppHandle = null;
+
+						prevprevValue = prevValue;
+						prevValue = sum;
+					}
 				}
 				
-				
-			}
-			
-		_*/	
+			}		
 		}
 		
 		// setPositions(true) checks whether jump handles 
