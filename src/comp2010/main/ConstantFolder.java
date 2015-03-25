@@ -11,6 +11,8 @@ import java.util.Stack;
 import java.util.EmptyStackException;
 import java.lang.ArithmeticException;
 
+import java.util.HashMap;
+
 public class ConstantFolder
 {
 	
@@ -37,6 +39,36 @@ public class ConstantFolder
 	
 	private void simpleFold (ConstantPoolGen cpgen) {
 		
+	}
+	
+	private static void storeVariable (InstructionHandle pHandle, InstructionHandle handle, ConstantPoolGen cpgen, HashMap<Integer,Number> variablesList) {
+		Instruction instruction = handle.getInstruction();
+		Instruction pInstruction = pHandle.getInstruction();
+		
+		if (instruction instanceof ISTORE) {
+			ISTORE ISTOREInstruction = (ISTORE)(instruction);
+			int index = ISTOREInstruction.getIndex();
+			Number value = getVal(cpgen, pHandle,variablesList);
+			variablesList.put(index, value.intValue());
+		}
+		else if (instruction instanceof FSTORE) {
+			FSTORE FSTOREInstruction = (FSTORE)(instruction);
+			int index = FSTOREInstruction.getIndex();
+			Number value = getVal(cpgen, pHandle,variablesList);
+			variablesList.put(index, value.floatValue());
+		}
+		else if (instruction instanceof LSTORE) {
+			LSTORE LSTOREInstruction = (LSTORE)(instruction);
+			int index = LSTOREInstruction.getIndex();
+			Number value = getVal(cpgen, pHandle,variablesList);
+			variablesList.put(index, value.longValue());
+		}
+		else if (instruction instanceof DSTORE) {
+			DSTORE DSTOREInstruction = (DSTORE)(instruction);
+			int index = DSTOREInstruction.getIndex();
+			Number value = getVal(cpgen, pHandle,variablesList);
+			variablesList.put(index, value.doubleValue());
+		}
 	}
 	
 	private static valueType getInstructionReturnType (InstructionHandle handle) {
@@ -71,7 +103,7 @@ public class ConstantFolder
 			}
 	}
 	
-	private static Number getVal (ConstantPoolGen cpgen, InstructionHandle handle) {
+	private static Number getVal (ConstantPoolGen cpgen, InstructionHandle handle, HashMap<Integer,Number>  variablesList) {
 		
 		Instruction instruction = handle.getInstruction();
 		Number value = 0;
@@ -135,6 +167,38 @@ public class ConstantFolder
 			SIPUSH SIPUSHInstruction = (SIPUSH)(instruction);
 			Number SIPUSHValue = SIPUSHInstruction.getValue();
 			value = SIPUSHValue.intValue();
+		}
+		else {
+			try {
+				
+				if (instruction instanceof ILOAD) {
+					ILOAD ILOADInstruction = (ILOAD)(instruction);
+					int index = ILOADInstruction.getIndex();
+					Number ILOADValue = variablesList.get(index);
+					value = ILOADValue.intValue();
+				}
+				else if (instruction instanceof FLOAD) {
+					FLOAD FLOADInstruction = (FLOAD)(instruction);
+					int index = FLOADInstruction.getIndex();
+					Number FLOADValue = variablesList.get(index);
+					value = FLOADValue.floatValue();
+				}
+				else if (instruction instanceof LLOAD) {
+					LLOAD LLOADInstruction = (LLOAD)(instruction);
+					int index = LLOADInstruction.getIndex();
+					Number LLOADValue = variablesList.get(index);
+					value = LLOADValue.longValue();
+				}
+				else if (instruction instanceof DLOAD) {
+					DLOAD DLOADInstruction = (DLOAD)(instruction);
+					int index = DLOADInstruction.getIndex();
+					Number DLOADValue = variablesList.get(index);
+					value = DLOADValue.doubleValue();
+				}
+			}
+			catch (NullPointerException e) {
+				
+			}
 		}
 
 		return value;
@@ -253,13 +317,14 @@ public class ConstantFolder
 		return result;
 	}
 	
-	private static InstructionHandle foldInstructions (InstructionHandle ppHandle, InstructionHandle pHandle, InstructionHandle handle, InstructionList instList, ConstantPoolGen cpgen) {
+	private static InstructionHandle foldInstructions (InstructionHandle ppHandle, InstructionHandle pHandle, InstructionHandle handle,
+					InstructionList instList, ConstantPoolGen cpgen, HashMap<Integer,Number> variablesList) {
 	
 		InstructionHandle newHandle;
 		valueType type = getInstructionReturnType(handle);
 		
-		Number pVal = getVal(cpgen, pHandle);
-		Number ppVal = getVal(cpgen, ppHandle);
+		Number pVal = getVal(cpgen, pHandle, variablesList);
+		Number ppVal = getVal(cpgen, ppHandle, variablesList);
 		Number result = getResult(ppVal, pVal, handle);
 		
 		switch (type) {
@@ -331,9 +396,9 @@ public class ConstantFolder
 		InstructionList instList = new InstructionList(methodCode.getCode());
 		MethodGen methodGen = new MethodGen(method.getAccessFlags(), method.getReturnType(), method.getArgumentTypes(), null, method.getName(), cgen.getClassName(), instList, cpgen);
 	
-		Stack instructionStack = new Stack();
-		
-		
+		Stack<InstructionHandle> instructionStack = new Stack<InstructionHandle>();
+
+		HashMap<Integer,Number> variablesList = new HashMap<Integer,Number>();
 		
 		InstructionHandle[] instructionHandles = instList.getInstructionHandles();
 		int length = instructionHandles.length;
@@ -347,10 +412,23 @@ public class ConstantFolder
 			if (currentInstruction instanceof CPInstruction || currentInstruction instanceof ICONST
 				|| currentInstruction instanceof FCONST || currentInstruction instanceof LCONST
 				|| currentInstruction instanceof DCONST || currentInstruction instanceof BIPUSH
-				|| currentInstruction instanceof SIPUSH) {
+				|| currentInstruction instanceof SIPUSH || (currentInstruction instanceof LoadInstruction && !variablesList.isEmpty())) {
 				
 				instructionStack.push(handle);
 
+			}
+			else if (currentInstruction instanceof StoreInstruction && instructionStack.size() > 0) {
+				InstructionHandle pHandle = null;
+				try {
+					pHandle = (InstructionHandle)(instructionStack.pop());
+				}
+				catch (EmptyStackException e) {
+					e.printStackTrace();
+					continue;
+				}
+				
+				storeVariable(pHandle, handle, cpgen, variablesList); // I hope that variablesList is passed by reference here!
+				
 			}
 			else if (currentInstruction instanceof ArithmeticInstruction && instructionStack.size() > 1) {
 				InstructionHandle pHandle = null, ppHandle = null;
@@ -362,9 +440,12 @@ public class ConstantFolder
 					e.printStackTrace();
 					continue;
 				}
-				InstructionHandle newHandle = foldInstructions(ppHandle, pHandle, handle, instList, cpgen);
+				InstructionHandle newHandle = foldInstructions(ppHandle, pHandle, handle, instList, cpgen, variablesList);
 				instructionStack.push(newHandle);
 			}	
+			
+			
+			
 		}
 		
 		// setPositions(true) checks whether jump handles 

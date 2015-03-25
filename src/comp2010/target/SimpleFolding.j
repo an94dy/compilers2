@@ -15,12 +15,13 @@
 
 	getstatic java/lang/System/out Ljava/io/PrintStream;
     ldc 20
-    iconst_1
-    ldc 40
-    ldc 50
+    fstore_1
+    ldc 10
+    iload_1
     iadd
-    iadd
-    iadd
+    iload_1
+    dload_1
+    imul
     invokevirtual java/io/PrintStream/println(I)V
 	return
 .end method
