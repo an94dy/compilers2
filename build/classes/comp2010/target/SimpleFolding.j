@@ -15,10 +15,10 @@
 
 	getstatic java/lang/System/out Ljava/io/PrintStream;
 	
-	sipush 15
-	ldc 15.155464846684
-    dsub
-	ldc2_w 10000.468640000
+	fconst_1
+	lconst_0
+	lmul
+	
 
     
     

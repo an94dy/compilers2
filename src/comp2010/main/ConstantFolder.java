@@ -39,9 +39,14 @@ public class ConstantFolder
 		int stackCheck = 0;
 		InstructionHandle pHandle = null, ppHandle = null;
 		Number prevVal = -1, prevPrevVal = -1;
-
-		for (InstructionHandle handle : instList.getInstructionHandles())
+		
+		InstructionHandle[] instructionHandles = instList.getInstructionHandles();
+		int length = instructionHandles.length;
+		int k =0;
+		
+		for (k = 0; k < length; k++)
 		{
+			InstructionHandle handle = instructionHandles[k];
 			Instruction currentInstruction = handle.getInstruction();
 			
 			if (currentInstruction instanceof CPInstruction) {
@@ -94,6 +99,19 @@ public class ConstantFolder
 				}
 	
 			}
+			else if (currentInstruction instanceof BIPUSH) {
+				
+				BIPUSH BIPUSHInstruction = (BIPUSH)(currentInstruction);
+				Number BIPUSHValue= BIPUSHInstruction.getValue();
+				
+				int value = BIPUSHValue.intValue();
+				ppHandle = pHandle;
+				pHandle = handle;
+				prevPrevVal = prevVal;
+				prevVal = value;
+				stackCheck++;
+					
+			}
 			else if (currentInstruction instanceof SIPUSH) {
 				
 				SIPUSH SIPUSHInstruction = (SIPUSH)(currentInstruction);
@@ -109,24 +127,64 @@ public class ConstantFolder
 			}
 			else if (currentInstruction instanceof ICONST) {
 				
-				/*ICONST ICONSTInstruction = (ICONST)(currentInstruction);
+				ICONST ICONSTInstruction = (ICONST)(currentInstruction);
 				Number ICONSTValue= ICONSTInstruction.getValue();
 				
 				int value = ICONSTValue.intValue();
 				ppHandle = pHandle;
 				pHandle = handle;
 				prevPrevVal = prevVal;
-				prevVal = value;*/
-					
+				prevVal = value;
+				//stackCheck++;	 WHY DOES THIS GIVE AN ERROR?!?!?!
+			}
+			else if (currentInstruction instanceof FCONST) {
+				
+				FCONST FCONSTInstruction = (FCONST)(currentInstruction);
+				Number FCONSTValue= FCONSTInstruction.getValue();
+				
+				float value = FCONSTValue.floatValue();
+				
+				ppHandle = pHandle;
+				pHandle = handle;
+				prevPrevVal = prevVal;
+				prevVal = value;
+				stackCheck++;	
+			}
+			else if (currentInstruction instanceof LCONST) {
+				
+				LCONST LCONSTInstruction = (LCONST)(currentInstruction);
+				Number LCONSTValue= LCONSTInstruction.getValue();
+				
+				long value = LCONSTValue.longValue();
+				
+				ppHandle = pHandle;
+				pHandle = handle;
+				prevPrevVal = prevVal;
+				prevVal = value;
+				stackCheck++;	
+			}
+			else if (currentInstruction instanceof DCONST) {
+				
+				DCONST DCONSTInstruction = (DCONST)(currentInstruction);
+				Number DCONSTValue= DCONSTInstruction.getValue();
+				
+				double value = DCONSTValue.doubleValue();
+				
+				ppHandle = pHandle;
+				pHandle = handle;
+				prevPrevVal = prevVal;
+				prevVal = value;
+				stackCheck++;	
 			}
 
 			else if (pHandle != null && currentInstruction instanceof ArithmeticInstruction && stackCheck > 1) {
+				Number result = 0;
+				int check = 0;
+				int newCpIndex = 0;
+				
 				if (currentInstruction instanceof IADD || currentInstruction instanceof ISUB
 					|| currentInstruction instanceof IMUL || currentInstruction instanceof IDIV
 					|| currentInstruction instanceof IREM) {
-					
-					
-					int result = 0;
 					
 					int a = prevPrevVal.intValue();
 					int b = prevVal.intValue();
@@ -147,32 +205,11 @@ public class ConstantFolder
 						result = a % b;
 					}
 					
-					int newCpIndex = cpgen.addInteger(result);;
-					InstructionHandle newHandle = instList.append(handle, new LDC(newCpIndex));
-					
-					try {
-						instList.delete(pHandle);
-						if (ppHandle != null) {
-							instList.delete(ppHandle);
-						}
-						instList.delete(handle);
-					}
-					catch (TargetLostException e)
-					{
-						e.printStackTrace();
-					}
-					
-					pHandle = newHandle;
-					ppHandle = null;
-					prevPrevVal = prevVal;
-					prevVal = result;
-					stackCheck++;
+					check = 1;
 				}
 				else if (currentInstruction instanceof FADD || currentInstruction instanceof FSUB
 						|| currentInstruction instanceof FMUL || currentInstruction instanceof FDIV
 						|| currentInstruction instanceof FREM) {
-						
-					float result = 0;
 					
 					float a = prevPrevVal.floatValue();
 					float b = prevVal.floatValue();
@@ -193,32 +230,11 @@ public class ConstantFolder
 						result = a % b;
 					}
 					
-					int newCpIndex = cpgen.addFloat(result);;
-					InstructionHandle newHandle = instList.append(handle, new LDC_W(newCpIndex));
-					
-					try {
-						instList.delete(pHandle);
-						if (ppHandle != null) {
-							instList.delete(ppHandle);
-						}
-						instList.delete(handle);
-					}
-					catch (TargetLostException e)
-					{
-						e.printStackTrace();
-					}
-					
-					pHandle = newHandle;
-					ppHandle = null;
-					prevPrevVal = prevVal;
-					prevVal = result;
-					stackCheck++;
+					check = 2;
 				}
 				else if (currentInstruction instanceof LADD || currentInstruction instanceof LSUB
 						|| currentInstruction instanceof LMUL || currentInstruction instanceof LDIV
 						|| currentInstruction instanceof LREM) {
-						
-					long result = 0;
 					
 					long a = prevPrevVal.longValue();
 					long b = prevVal.longValue();
@@ -239,32 +255,11 @@ public class ConstantFolder
 						result = a % b;
 					}
 					
-					int newCpIndex = cpgen.addLong(result);
-					InstructionHandle newHandle = instList.append(handle, new LDC2_W(newCpIndex));
-					
-					try {
-						instList.delete(pHandle);
-						if (ppHandle != null) {
-							instList.delete(ppHandle);
-						}
-						instList.delete(handle);
-					}
-					catch (TargetLostException e)
-					{
-						e.printStackTrace();
-					}
-					
-					pHandle = newHandle;
-					ppHandle = null;
-					prevPrevVal = prevVal;
-					prevVal = result;
-					stackCheck++;
+					check = 3;
 				}
 				else if (currentInstruction instanceof DADD || currentInstruction instanceof DSUB
 						|| currentInstruction instanceof DMUL || currentInstruction instanceof DDIV
 						|| currentInstruction instanceof DREM) {
-						
-					double result = 0;
 					
 					double a = prevPrevVal.doubleValue();
 					double b = prevVal.doubleValue();
@@ -285,8 +280,54 @@ public class ConstantFolder
 						result = a % b;
 					}
 					
-					int newCpIndex = cpgen.addDouble(result);;
-					InstructionHandle newHandle = instList.append(handle, new LDC2_W(newCpIndex));
+					check = 4;
+				}
+				
+				if (check > 0) {
+					InstructionHandle newHandle;
+					switch (check) {
+						case 1: //integer
+							/*int val = result.intValue();
+							if (val >= -1 && val <= 5) {
+								newHandle = instList.append(handle, new ICONST((byte)(val)));
+							}
+							else if (val >= -128 && val <= 127) {
+								newHandle = instList.append(handle, new BIPUSH((byte)(val)));
+							}
+							else if (val >= -32768 && val <= 32767) {
+								newHandle = instList.append(handle, new SIPUSH((short)(val)));
+							}
+							else {
+								newCpIndex = cpgen.addInteger(val);
+								newHandle = instList.append(handle, new LDC(newCpIndex));
+							}*/
+							newHandle = instList.append(handle, new PUSH(cpgen, result.intValue()));
+							break;
+							
+						case 2: //float
+							//newCpIndex = cpgen.addFloat(result.floatValue());;
+							//newHandle = instList.append(handle, new LDC_W(newCpIndex));
+							newHandle = instList.append(handle, new PUSH(cpgen, result.floatValue()));
+							break;
+							
+						case 3: //long
+							//newCpIndex = cpgen.addLong(result.longValue());
+							//newHandle = instList.append(handle, new LDC2_W(newCpIndex));
+							newHandle = instList.append(handle, new PUSH(cpgen, result.longValue()));
+							break;
+							
+						case 4: //double
+							//newCpIndex = cpgen.addDouble(result.doubleValue());
+							//newHandle = instList.append(handle, new LDC2_W(newCpIndex));
+							newHandle = instList.append(handle, new PUSH(cpgen, result.doubleValue()));
+							break;
+							
+						default:
+							newHandle = handle;
+							break;
+					}
+					
+					
 					
 					try {
 						instList.delete(pHandle);
@@ -297,9 +338,15 @@ public class ConstantFolder
 					}
 					catch (TargetLostException e)
 					{
-						e.printStackTrace();
+					     InstructionHandle[] targets = e.getTargets();
+
+					     for(int i=0; i < targets.length; i++) {
+					          InstructionTargeter[] targeters = targets[i].getTargeters();
+
+					          for(int j=0; j < targeters.length; j++)
+					               targeters[j].updateTarget(targets[i], handle);
+					     }
 					}
-					
 					pHandle = newHandle;
 					ppHandle = null;
 					prevPrevVal = prevVal;
