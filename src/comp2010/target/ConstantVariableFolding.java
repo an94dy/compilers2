@@ -11,7 +11,6 @@ public class ConstantVariableFolding
     public double methodTwo(){
         double i = 0;
         int j = 1;
-String aa = "asdaaaaaaaaaaaa";
         return i + j;
     }
 
