@@ -50,7 +50,13 @@ public class ConstantFolder
 			instruction instanceof FCMPL || 
 			instruction instanceof LCMP	|| 
 			instruction instanceof DCMPG || 
-			instruction instanceof DCMPL
+			instruction instanceof DCMPL ||
+			instruction instanceof IAND ||
+			instruction instanceof IXOR ||
+			instruction instanceof IOR ||
+			instruction instanceof ISHR ||
+			instruction instanceof ISHL ||
+			instruction instanceof IUSHR
 			) 
 		{
 			return valueType.INT;
@@ -67,7 +73,14 @@ public class ConstantFolder
 				 instruction instanceof LSUB ||
 				 instruction instanceof LMUL ||
 				 instruction instanceof LDIV || 
-				 instruction instanceof LREM) 
+				 instruction instanceof LREM ||
+				 instruction instanceof LAND ||
+				 instruction instanceof LXOR ||
+				 instruction instanceof LOR ||
+				 instruction instanceof LSHR ||
+				 instruction instanceof LSHL ||
+				 instruction instanceof LUSHR
+				 ) 
 		{
 			return valueType.LONG;
 		}
@@ -157,8 +170,66 @@ public class ConstantFolder
 		
 		Instruction instruction = handle.getInstruction();
 		Number result = 0;
-		
-		if (instruction instanceof DCMPG ||
+		if (instruction instanceof IfInstruction) {
+			int a = ppVal.intValue();
+			int b = pVal.intValue();
+			
+			if (instruction instanceof IF_ICMPEQ) {
+				
+				if (a == b) {
+					result = 0;
+				}
+				else {
+					result = 1;
+				}
+			}
+			else if (instruction instanceof IF_ICMPGE) {
+				
+				if (a >= b) {
+					result = 0;
+				}
+				else {
+					result = 1;
+				}
+			}
+			else if (instruction instanceof IF_ICMPGT) {
+				
+				if (a > b) {
+					result = 0;
+				}
+				else {
+					result = 1;
+				}
+			}
+			else if (instruction instanceof IF_ICMPLE) {
+				
+				if (a <= b) {
+					result = 0;
+				}
+				else {
+					result = 1;
+				}
+			}
+			else if (instruction instanceof IF_ICMPLT) {
+				
+				if (a < b) {
+					result = 0;
+				}
+				else {
+					result = 1;
+				}
+			}
+			else if (instruction instanceof IF_ICMPNE) {
+				
+				if (a != b) {
+					result = 0;
+				}
+				else {
+					result = 1;
+				}
+			}
+		}
+		else if (instruction instanceof DCMPG ||
 			instruction instanceof DCMPL ||
 			instruction instanceof FCMPG ||
 			instruction instanceof FCMPL ||
@@ -349,6 +420,23 @@ public class ConstantFolder
 		     }
 		}
 	}
+	
+	private static void deleteInstruction (InstructionHandle from, InstructionHandle to, InstructionList instList) {
+		try {
+			instList.delete(from, to);
+		}
+		catch (TargetLostException e)
+		{
+		     InstructionHandle[] targets = e.getTargets();
+
+		     for(int i=0; i < targets.length; i++) {
+		          InstructionTargeter[] targeters = targets[i].getTargeters();
+
+		          for(int j=0; j < targeters.length; j++)
+		               targeters[j].updateTarget(targets[i], from);
+		     }
+		}
+	}
 
 	private static InstructionHandle negateInstruction(InstructionHandle pHandle, InstructionHandle handle, InstructionList instList, ConstantPoolGen cpgen) {
 		Instruction newInstruction = null;
@@ -368,13 +456,24 @@ public class ConstantFolder
 			newInstruction = new PUSH(cpgen, -(val.doubleValue())).getInstruction();
 		}
 		
-		if (instruction != null) {
+		if (newInstruction != null) {
 			pHandle.setInstruction(newInstruction);
+			try {
+				
+				InstructionTargeter[] targeters = handle.getTargeters();
+				for (InstructionTargeter targeter : targeters) {
+					pHandle.addTargeter(targeter);
+				}
+				instList.redirectBranches(handle, pHandle);
+			}
+			catch (NullPointerException e) {
+			}
+			deleteInstruction(handle, instList);
+			return pHandle;
 		}
-		
-		deleteInstruction(handle, instList);
-		
-		return handle;
+		else {
+			return null;
+		}
 		
 	}
 	
@@ -407,17 +506,30 @@ public class ConstantFolder
 		
 		if (newInstruction != null) {
 			pHandle.setInstruction(newInstruction);
+			try {
+				InstructionTargeter[] targeters = handle.getTargeters();
+				for (InstructionTargeter targeter : targeters) {
+					pHandle.addTargeter(targeter);
+				}
+				instList.redirectBranches(handle, pHandle);
+			}
+			catch (NullPointerException e) {
+				
+			}
+			deleteInstruction(handle, instList);
+			return pHandle;
+		}
+		else {
+			return null;
 		}
 		
-		deleteInstruction(pHandle, instList);
 		
-		return pHandle;
 	}
 		
 	private static InstructionHandle foldInstructions (InstructionHandle ppHandle, InstructionHandle pHandle, InstructionHandle handle,
 					InstructionList instList, ConstantPoolGen cpgen) {
 	
-		InstructionHandle newHandle;
+		Instruction newInstruction;
 		valueType type = getInstructionReturnType(handle);
 		
 		Number pVal = getVal(cpgen, pHandle);
@@ -428,51 +540,103 @@ public class ConstantFolder
 			case INT:
 				/*int val = result.intValue();
 				if (val >= -1 && val <= 5) {
-					newHandle = instList.append(handle, new ICONST((byte)(val)));
+					newInstruction = instList.append(handle, new ICONST((byte)(val)));
 				}
 				else if (val >= -128 && val <= 127) {
-					newHandle = instList.append(handle, new BIPUSH((byte)(val)));
+					newInstruction = instList.append(handle, new BIPUSH((byte)(val)));
 				}
 				else if (val >= -32768 && val <= 32767) {
-					newHandle = instList.append(handle, new SIPUSH((short)(val)));
+					newInstruction = instList.append(handle, new SIPUSH((short)(val)));
 				}
 				else {
 					newCpIndex = cpgen.addInteger(val);
-					newHandle = instList.append(handle, new LDC(newCpIndex));
+					newInstruction = instList.append(handle, new LDC(newCpIndex));
 				}*/
-				newHandle = instList.append(handle, new PUSH(cpgen, result.intValue()));
+				newInstruction = new PUSH(cpgen, result.intValue()).getInstruction();
 				break;
 				
 			case FLOAT:
 				//newCpIndex = cpgen.addFloat(result.floatValue());;
-				//newHandle = instList.append(handle, new LDC_W(newCpIndex));
-				newHandle = instList.append(handle, new PUSH(cpgen, result.floatValue()));
+				//newInstruction = instList.append(handle, new LDC_W(newCpIndex));
+				newInstruction = new PUSH(cpgen, result.floatValue()).getInstruction();
 				break;
 				
 			case LONG:
 				//newCpIndex = cpgen.addLong(result.longValue());
-				//newHandle = instList.append(handle, new LDC2_W(newCpIndex));
-				newHandle = instList.append(handle, new PUSH(cpgen, result.longValue()));
+				//newInstruction = instList.append(handle, new LDC2_W(newCpIndex));
+				newInstruction = new PUSH(cpgen, result.longValue()).getInstruction();
 				break;
 				
 			case DOUBLE:
 				//newCpIndex = cpgen.addDouble(result.doubleValue());
-				//newHandle = instList.append(handle, new LDC2_W(newCpIndex));
-				newHandle = instList.append(handle, new PUSH(cpgen, result.doubleValue()));
+				//newInstruction = instList.append(handle, new LDC2_W(newCpIndex));
+				newInstruction = new PUSH(cpgen, result.doubleValue()).getInstruction();
 				break;
 				
 			default:
-				newHandle = handle;
+				newInstruction = null;
 				break;
 		}
-		
-		deleteInstruction(handle, instList);
-		deleteInstruction(pHandle, instList);
-		deleteInstruction(ppHandle, instList);
-		
-		return newHandle;
+		if (newInstruction != null) {
+			ppHandle.setInstruction(newInstruction);
+			try {
+				InstructionTargeter[] handleTargeters = handle.getTargeters();
+				InstructionTargeter[] pHandleTargeters = pHandle.getTargeters();
+	
+				for (InstructionTargeter targeter : handleTargeters) {
+					ppHandle.addTargeter(targeter);
+				}
+				for (InstructionTargeter targeter : pHandleTargeters) {
+					ppHandle.addTargeter(targeter);
+				}
+				
+				instList.redirectBranches(pHandle, ppHandle);
+				instList.redirectBranches(handle, ppHandle);
+			}
+			catch (NullPointerException e) {
+			}
+			deleteInstruction(handle, instList);
+			deleteInstruction(pHandle, instList);
+			return ppHandle;
+			
+		}
+		else {
+			return null;
+		}
 	}
 
+	private static InstructionHandle solveIfInstruction(InstructionHandle ppHandle, InstructionHandle pHandle, InstructionHandle handle, ConstantPoolGen cpgen, InstructionList instList) {
+		IfInstruction ifInstruction = (IfInstruction)(handle.getInstruction());
+		InstructionHandle target = ifInstruction.getTarget();
+		
+		Number pVal = getVal(cpgen, pHandle);
+		Number ppVal = getVal(cpgen, ppHandle);
+		Number result = getResult(ppVal, pVal, handle);
+		int resultVal = result.intValue();
+		
+		deleteInstruction(ppHandle, instList);
+		deleteInstruction(pHandle, instList);
+		deleteInstruction(handle, instList);
+		
+		if (resultVal == 0) {
+			return target;
+		}
+		else {
+			return null;
+		}
+		
+	}
+	
+	private static InstructionHandle solveGoToInstruction(InstructionHandle handle, ConstantPoolGen cpgen, InstructionList instList) {
+		GOTO goToInstruction = (GOTO)(handle.getInstruction());
+		InstructionHandle target = goToInstruction.getTarget();
+		deleteInstruction(handle, instList);
+		return target;
+		
+	}
+	
+	
+	/*
 	private void simpleFold (ConstantPoolGen cpgen, InstructionList instList) {
 		
 		Stack<InstructionHandle> instructionStack = new Stack<InstructionHandle>();
@@ -508,7 +672,9 @@ public class ConstantFolder
 				}
 				
 				InstructionHandle newHandle = convertInstruction(pHandle, handle, cpgen, instList);
-				instructionStack.push(newHandle);
+				if (newHandle != null) {
+					instructionStack.push(newHandle);
+				}
 			}
 			else if (currentInstruction instanceof ArithmeticInstruction ||
 					currentInstruction instanceof FCMPG ||
@@ -530,7 +696,9 @@ public class ConstantFolder
 						continue;
 					}
 					InstructionHandle newHandle = negateInstruction(pHandle, handle, instList, cpgen);
-					instructionStack.push(newHandle);
+					if (newHandle != null) {
+						instructionStack.push(newHandle);
+					}
 					
 				}
 				else if (instructionStack.size() > 1) {
@@ -557,7 +725,7 @@ public class ConstantFolder
 			}
 		}
 	}
-
+*/
 	
 	
 	
@@ -601,6 +769,7 @@ public class ConstantFolder
 		}
 		catch (NullPointerException e) {
 		}
+		//handle.setInstruction();
 	}
 	
 	private static InstructionHandle replaceLoadInstruction (InstructionHandle handle, ConstantPoolGen cpgen, InstructionList instList, HashMap<Integer,Number> variablesList) {
@@ -663,109 +832,185 @@ public class ConstantFolder
 		int length = instructionHandles.length;
 		int k =0;
 		
+		InstructionHandle removeUntil = null;
+		boolean gotoAfterIf = false;
 		
 		for (k = 0; k < length; k++)
 		{
-			InstructionHandle handle = instructionHandles[k];
-			Instruction currentInstruction = handle.getInstruction();
 			
-			if (currentInstruction instanceof LDC || 
-				currentInstruction instanceof LDC_W || 
-				currentInstruction instanceof LDC2_W || 
-				currentInstruction instanceof ICONST ||
-				currentInstruction instanceof FCONST ||
-				currentInstruction instanceof LCONST ||
-				currentInstruction instanceof DCONST ||
-				currentInstruction instanceof BIPUSH ||
-				currentInstruction instanceof SIPUSH
-				) 
-			{
-				instructionStack.push(handle);
-			}
-			else if (currentInstruction instanceof StoreInstruction && instructionStack.size() > 0) {
-				InstructionHandle pHandle = null;
-				try {
-					pHandle = (InstructionHandle)(instructionStack.pop());
+			InstructionHandle handle = instructionHandles[k];
+			if (removeUntil != null) {
+				if (handle == removeUntil) {
+					removeUntil = null;
 				}
-				catch (EmptyStackException e) {
-					e.printStackTrace();
-					continue;
-				}	
-				if (!(currentInstruction instanceof ASTORE)) {
-					storeVariable(pHandle, handle, cpgen, variablesList);
+				else {
 					deleteInstruction(handle, instList);
-					deleteInstruction(pHandle, instList);
 				}
+			}
+			
+			if (removeUntil == null) {
+				Instruction currentInstruction = handle.getInstruction();
 				
-			}
-			else if (currentInstruction instanceof IINC && !variablesList.isEmpty()) {
-				incrementIntegerVariable(handle, variablesList);		
-			}
-			else if (currentInstruction instanceof LoadInstruction && !variablesList.isEmpty()) {
-				if (!(currentInstruction instanceof ALOAD)) {
-					InstructionHandle newHandle = replaceLoadInstruction (handle, cpgen, instList, variablesList);
-					if (newHandle != null) {
-						instructionStack.push(handle);
-					}
+				if (currentInstruction instanceof LDC || 
+					currentInstruction instanceof LDC_W || 
+					currentInstruction instanceof LDC2_W || 
+					currentInstruction instanceof ICONST ||
+					currentInstruction instanceof FCONST ||
+					currentInstruction instanceof LCONST ||
+					currentInstruction instanceof DCONST ||
+					currentInstruction instanceof BIPUSH ||
+					currentInstruction instanceof SIPUSH
+					) 
+				{
+					instructionStack.push(handle);
 				}
-			}
-			else if (currentInstruction instanceof ConversionInstruction && instructionStack.size() > 0) {
-				InstructionHandle pHandle = null;
-				try {
-					pHandle = (InstructionHandle)(instructionStack.pop());
-				}
-				catch (EmptyStackException e) {
-					e.printStackTrace();
-					continue;
-				}
-				
-				InstructionHandle newHandle = convertInstruction(pHandle, handle, cpgen, instList);
-				instructionStack.push(newHandle);
-			}
-			else if (currentInstruction instanceof ArithmeticInstruction ||
-					 currentInstruction instanceof FCMPG ||
-					 currentInstruction instanceof FCMPL ||
-					 currentInstruction instanceof LCMP ||
-					 currentInstruction instanceof DCMPG ||
-					 currentInstruction instanceof DCMPL) {
-				
-				InstructionHandle pHandle = null, ppHandle = null;
-				if ((currentInstruction instanceof INEG || currentInstruction instanceof FNEG
-					|| currentInstruction instanceof LNEG || currentInstruction instanceof DNEG) 
-					&& instructionStack.size() > 0) {
+				else if (currentInstruction instanceof IfInstruction && instructionStack.size() > 0) {
 					
-					try {
-						pHandle = (InstructionHandle)(instructionStack.pop());
-					}
-					catch (EmptyStackException e) {
-						e.printStackTrace();
-						continue;
-					}
-					InstructionHandle newHandle = negateInstruction(pHandle, handle, instList, cpgen);
-					instructionStack.push(newHandle);
-				}
-				else if (instructionStack.size() > 1) {
+					InstructionHandle pHandle = null, ppHandle = null;
+					if (
+						(
+						currentInstruction instanceof IF_ACMPEQ 
+						|| currentInstruction instanceof IF_ACMPEQ
+						|| currentInstruction instanceof IF_ICMPEQ
+						|| currentInstruction instanceof IF_ICMPGE
+						|| currentInstruction instanceof IF_ICMPGT
+						|| currentInstruction instanceof IF_ICMPLE
+						|| currentInstruction instanceof IF_ICMPLT
+						|| currentInstruction instanceof IF_ICMPNE
+						)
+						&& instructionStack.size() > 1) {
+						
+						try {
+							pHandle = (InstructionHandle)(instructionStack.pop());
+							ppHandle = (InstructionHandle)(instructionStack.pop());
+						}
+						catch (EmptyStackException e) {
+							e.printStackTrace();
+							continue;
+						}	
+						
+						if (
+							currentInstruction instanceof IF_ICMPEQ
+							|| currentInstruction instanceof IF_ICMPGE
+							|| currentInstruction instanceof IF_ICMPGT
+							|| currentInstruction instanceof IF_ICMPLE
+							|| currentInstruction instanceof IF_ICMPLT
+							|| currentInstruction instanceof IF_ICMPNE
+							) {
+							
+							removeUntil = solveIfInstruction(ppHandle, pHandle, handle, cpgen, instList);
+							
 
+							gotoAfterIf = true;
+		
+						}
+						
+					}
+					else {
+						try {
+							pHandle = (InstructionHandle)(instructionStack.pop());
+						}
+						catch (EmptyStackException e) {
+							e.printStackTrace();
+							continue;
+						}	
+					}
+					
+					
+				}
+				else if (currentInstruction instanceof GOTO && gotoAfterIf) {
+					removeUntil = solveGoToInstruction(handle, cpgen, instList);
+				}
+				else if (currentInstruction instanceof StoreInstruction && instructionStack.size() > 0) {
+					InstructionHandle pHandle = null;
 					try {
 						pHandle = (InstructionHandle)(instructionStack.pop());
-						ppHandle = (InstructionHandle)(instructionStack.pop());
+					}
+					catch (EmptyStackException e) {
+						e.printStackTrace();
+						continue;
+					}	
+					if (!(currentInstruction instanceof ASTORE)) {
+						storeVariable(pHandle, handle, cpgen, variablesList);
+						deleteInstruction(handle, instList);
+						deleteInstruction(pHandle, instList);
+					}
+					
+				}
+				else if (currentInstruction instanceof IINC && !variablesList.isEmpty()) {
+					incrementIntegerVariable(handle, variablesList);
+					
+				}
+				else if (currentInstruction instanceof LoadInstruction && !variablesList.isEmpty()) {
+					if (!(currentInstruction instanceof ALOAD)) {
+						InstructionHandle newHandle = replaceLoadInstruction (handle, cpgen, instList, variablesList);
+						if (newHandle != null) {
+							instructionStack.push(newHandle);
+						}
+					}
+				}
+				else if (currentInstruction instanceof ConversionInstruction && instructionStack.size() > 0) {
+					InstructionHandle pHandle = null;
+					try {
+						pHandle = (InstructionHandle)(instructionStack.pop());
 					}
 					catch (EmptyStackException e) {
 						e.printStackTrace();
 						continue;
 					}
-					InstructionHandle newHandle = foldInstructions(ppHandle, pHandle, handle, instList, cpgen);
+					
+					InstructionHandle newHandle = convertInstruction(pHandle, handle, cpgen, instList);
 					if (newHandle != null) {
 						instructionStack.push(newHandle);
 					}
 				}
-			}
-			else if (currentInstruction instanceof StackProducer || currentInstruction instanceof StackConsumer) {
-				try {
-					instructionStack.clear();
+				else if (currentInstruction instanceof ArithmeticInstruction ||
+						 currentInstruction instanceof FCMPG ||
+						 currentInstruction instanceof FCMPL ||
+						 currentInstruction instanceof LCMP ||
+						 currentInstruction instanceof DCMPG ||
+						 currentInstruction instanceof DCMPL) {
+					
+					InstructionHandle pHandle = null, ppHandle = null;
+					if ((currentInstruction instanceof INEG || currentInstruction instanceof FNEG
+						|| currentInstruction instanceof LNEG || currentInstruction instanceof DNEG) 
+						&& instructionStack.size() > 0) {
+						
+						try {
+							pHandle = (InstructionHandle)(instructionStack.pop());
+						}
+						catch (EmptyStackException e) {
+							e.printStackTrace();
+							continue;
+						}
+						InstructionHandle newHandle = negateInstruction(pHandle, handle, instList, cpgen);
+						if (newHandle != null) {
+							instructionStack.push(newHandle);
+						}
+					}
+					else if (instructionStack.size() > 1) {
+
+						try {
+							pHandle = (InstructionHandle)(instructionStack.pop());
+							ppHandle = (InstructionHandle)(instructionStack.pop());
+						}
+						catch (EmptyStackException e) {
+							e.printStackTrace();
+							continue;
+						}
+						InstructionHandle newHandle = foldInstructions(ppHandle, pHandle, handle, instList, cpgen);
+						if (newHandle != null) {
+							instructionStack.push(newHandle);
+						}
+					}
 				}
-				catch (EmptyStackException e) {
-					e.printStackTrace();
+				else if (currentInstruction instanceof StackProducer || currentInstruction instanceof StackConsumer) {
+					try {
+						instructionStack.clear();
+					}
+					catch (EmptyStackException e) {
+						e.printStackTrace();
+					}
 				}
 			}
 		}
@@ -811,7 +1056,6 @@ public class ConstantFolder
 		for (Method m : methods)
 		{
 			optimizeMethod(cgen, cpgen, m);
-
 		}
 
 		this.optimized = cgen.getJavaClass();

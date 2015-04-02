@@ -32,18 +32,7 @@ public class DynamicVariableFoldingTest
         assertEquals(3630, dvf.methodOne());
     }
 
-    @Test
-    public void testMethodTwoOut()
-    {
-        dvf.methodTwo();
-        assertEquals("true\n", outContent.toString());
-    }
 
-    @Test
-    public void testMethodTwoReturn()
-    {
-        assertEquals(true, dvf.methodTwo());
-    }
 
     @Test
     public void testMethodThree()
